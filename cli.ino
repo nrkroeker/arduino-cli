@@ -105,25 +105,6 @@ int parseLine() {
 }
 
 // HELP functions to provide clarification about commands
-int cmd_help() {
-	if(args[1] == NULL) {
-		Serial.println("Please enter a valid command. See HELP options for more information.");
-	 	help_help();
-	} else if(strcmp(args[1], commands_str[0]) == 0) {
-		help_help();
-	}
-	else if(strcmp(args[1], commands_str[1]) == 0) {
-		help_show();
-	}
-	else if(strcmp(args[1], commands_str[2]) == 0) {
-		help_set();
-	}
-	else{
-		Serial.println("Please enter a valid command. See HELP options for more information.");
-		help_help();
-	}
-}
-
 void help_help() {
 	Serial.println("[HELP] Command: HELP\n[HELP] Description: displays the different CLI options.");
 	Serial.println("[HELP] Commands: ");
@@ -146,6 +127,25 @@ void help_set() {
 	Serial.println("[HELP] Description: Allows you to alter a variable in the program.");
 	print_params();
 	Serial.println("[HELP] Usage: Type SET <param> <variable> <value> to change that variable (ex. \"SET WIFI SSID wifi-network-name\").");
+}
+
+int cmd_help() {
+	if(args[1] == NULL) {
+		Serial.println("Please enter a valid command. See HELP options for more information.");
+	 	help_help();
+	} else if(strcmp(args[1], commands_str[0]) == 0) {
+		help_help();
+	}
+	else if(strcmp(args[1], commands_str[1]) == 0) {
+		help_show();
+	}
+	else if(strcmp(args[1], commands_str[2]) == 0) {
+		help_set();
+	}
+	else{
+		Serial.println("Please enter a valid command. See HELP options for more information.");
+		help_help();
+	}
 }
 
 void print_params() {
