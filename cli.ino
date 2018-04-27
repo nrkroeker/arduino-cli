@@ -1,7 +1,7 @@
 // Definitions, function declarations, and variables for CLI
 #define CLI_BUF_SIZE 128
 #define ARG_BUF_SIZE 128
-#define ARG_MAX_NUM 4
+#define ARG_MAX_NUM 3
 
 int cmd_help();
 int cmd_show();
@@ -11,7 +11,8 @@ int cmd_set();
 int (*commands_func[3])() = {
     &cmd_help,
     &cmd_show,
-    &cmd_set};
+    &cmd_set
+};
 
 char cli_line[CLI_BUF_SIZE];
 char args[ARG_MAX_NUM][ARG_BUF_SIZE];
@@ -19,53 +20,43 @@ char args[ARG_MAX_NUM][ARG_BUF_SIZE];
 // Variables shared between CLI and other stuff
 char ssid[ARG_BUF_SIZE];
 char password[ARG_BUF_SIZE];
-char serverIp[ARG_BUF_SIZE]; // pass into udpIP
+char ipaddress[ARG_BUF_SIZE]; // pass into udpIP
 char port[ARG_BUF_SIZE];
 char period[ARG_BUF_SIZE]; // call when delaying sense distance task
+char buffer[ARG_BUF_SIZE];
 
 // Character arrays of each set of CLI commands
 const char *commands_str[] = {
     "HELP",
     "SHOW",
-    "SET"};
+    "SET"
+};
 int num_commands = sizeof(commands_str) / sizeof(char *);
 
 const char *param_args[] = {
-    "WIFI",
-    "SERVER",
-    "SENSOR"};
+    "--ssid",
+    "--password",
+    "--ipaddress",
+    "--port",
+    "--period",
+    "--buffer"
+};
 int num_params = sizeof(param_args) / sizeof(char *);
 
-const char *wifi_args[] = {
-    "SSID",
-    "PASS"};
-const char *server_args[] = {
-    "ADDRESS",
-    "PORT"};
-const char *sensor_args[] = {
-    "PERIOD",
-};
-
-void run_cli(void *pvParameters)
-{
+void run_cli(void *pvParameters) {
+    EEPROM.put(CONFIG_ADDR, configVars);
     String line_string;
     // Continuously search for serial input
-    for (;;)
-    {
-        while (!Serial.available())
-            ;
-        if (Serial.available())
-        {
+    for (;;) {
+        while (!Serial.available());
+        if (Serial.available()) {
             line_string = Serial.readStringUntil('\n');
             // When received input, parse and execute command
-            if (line_string.length() < CLI_BUF_SIZE)
-            {
+            if (line_string.length() < CLI_BUF_SIZE) {
                 line_string.toCharArray(cli_line, CLI_BUF_SIZE);
                 Serial.println(line_string);
                 parseLine();
-            }
-            else
-            {
+            } else {
                 Serial.println("Command entered is too long.");
             }
         }
@@ -75,40 +66,30 @@ void run_cli(void *pvParameters)
     }
 }
 
-int parseLine()
-{
+int parseLine() {
     char *argument;
     int counter = 0;
     argument = strtok(cli_line, " ");
 
     // Loop through arguments separated by space
-    while ((argument != NULL))
-    {
-        if (counter < ARG_MAX_NUM)
-        {
-            if (strlen(argument) < ARG_BUF_SIZE)
-            {
+    while ((argument != NULL)) {
+        if (counter < ARG_MAX_NUM) {
+            if (strlen(argument) < ARG_BUF_SIZE) {
                 // Add argument to array
                 strcpy(args[counter], argument);
                 argument = strtok(NULL, " ");
                 counter++;
-            }
-            else
-            {
+            } else {
                 Serial.println("Command entered is too long.");
                 break;
             }
-        }
-        else
-        {
+        } else {
             break;
         }
     }
     // Find base command function matching input
-    for (int i = 0; i < num_commands; i++)
-    {
-        if (strcmp(args[0], commands_str[i]) == 0)
-        {
+    for (int i = 0; i < num_commands; i++) {
+        if (strcmp(args[0], commands_str[i]) == 0) {
             return (*commands_func[i])();
         }
     }
@@ -117,298 +98,147 @@ int parseLine()
 }
 
 // HELP functions to provide clarification about commands
-void help_help()
-{
+void help_help() {
     Serial.println("[HELP] Command: HELP\n[HELP] Description: displays the different CLI options.");
     Serial.println("[HELP] Commands: ");
-    for (int i = 0; i < num_commands; i++)
-    {
+    for (int i = 0; i < num_commands; i++) {
         Serial.print(" - ");
         Serial.println(commands_str[i]);
     }
     Serial.println("[HELP] Usage: Type HELP <command> for details on that specific option (ex. \"HELP SHOW\").");
 }
 
-void help_show()
-{
+void help_show() {
     Serial.println("[HELP] Command: SHOW");
     Serial.println("[HELP] Description: Displays the data values currently set for a given parameter.");
     print_params();
-    Serial.println("[HELP] Usage: Type SHOW <param> to see all data for that parameter (ex. \"SHOW WIFI\"), or SHOW <param> <variable> to view a specific variable (ex. \"SHOW WIFI SSID\").");
+    Serial.println("[HELP] Usage: Type SHOW <param> to see that variable's value (ex. \"SHOW  --ssid\").");
 }
 
-void help_set()
-{
+void help_set() {
     Serial.println("[HELP] Command: SET");
     Serial.println("[HELP] Description: Allows you to alter a variable in the program.");
     print_params();
-    Serial.println("[HELP] Usage: Type SET <param> <variable> <value> to change that variable (ex. \"SET WIFI SSID wifi-network-name\").");
+    Serial.println("[HELP] Usage: Type SET <param> <value> to change that variable (ex. \"SET --ssid wifi-network-name\").");
 }
 
-int cmd_help()
-{
-    if (args[1] == NULL)
-    {
+int cmd_help() {
+    if (args[1] == NULL) {
         Serial.println("Please enter a valid command. See HELP options for more information.");
         help_help();
-    }
-    else if (strcmp(args[1], commands_str[0]) == 0)
-    {
+    } else if (strcmp(args[1], commands_str[0]) == 0) {
         help_help();
-    }
-    else if (strcmp(args[1], commands_str[1]) == 0)
-    {
+    } else if (strcmp(args[1], commands_str[1]) == 0) {
         help_show();
-    }
-    else if (strcmp(args[1], commands_str[2]) == 0)
-    {
+    } else if (strcmp(args[1], commands_str[2]) == 0) {
         help_set();
-    }
-    else
-    {
+    } else {
         Serial.println("Please enter a valid command. See HELP options for more information.");
         help_help();
     }
 }
 
-void print_params()
-{
+void print_params() {
     Serial.println("[HELP] Parameters:");
-    for (int i = 0; i < num_params; i++)
-    {
-        Serial.print(" - ");
+    for (int i = 0; i < num_params; i++) {
+        Serial.print("  ");
         Serial.println(param_args[i]);
-        Serial.println("  Variables:");
-        if (strcmp(param_args[i], "WIFI") == 0)
-        {
-            Serial.println("   - SSID: Wifi connection name");
-            Serial.println("   - PASS: Wifi password");
-        }
-        else if (strcmp(param_args[i], "SERVER") == 0)
-        {
-            Serial.println("   - ADDRESS: Server IP address");
-            Serial.println("   - PORT: Server port");
-        }
-        else if (strcmp(param_args[i], "SENSOR") == 0)
-        {
-            Serial.println("   - PERIOD: Sensor period between distances");
-        }
     }
 }
 
-// SHOW functions to display currently set values
-void show_wifi()
-{
-    if (args[2] == NULL)
-    {
-        Serial.print("[SHOW] Wifi SSID: ");
+// SHOW function to display currently set values
+int cmd_show() {
+    if (args[1] == NULL) {
+        Serial.print("SSID: ");
         Serial.println(ssid);
-        Serial.print("[SHOW] Wifi Password: ");
+        Serial.print("Password: ");
         Serial.println(password);
-    }
-    else if (strcmp(args[2], wifi_args[0]) == 0)
-    {
-        Serial.print("[SHOW] Wifi SSID: ");
+        Serial.print("IP Address: ");
+        Serial.println(ipaddress);
+        Serial.print("Port: ");
+        Serial.println(port);
+        Serial.print("Period: ");
+        Serial.println(period);
+        Serial.print("Buffer: ");
+        Serial.println(buffer);
+    } else if (strcmp(args[1], param_args[0]) == 0) {
+        Serial.print("SSID: ");
         Serial.println(ssid);
-    }
-    else if (strcmp(args[2], wifi_args[1]) == 0)
-    {
-        Serial.print("[SHOW] Wifi Password: ");
+    } else if (strcmp(args[1], param_args[1]) == 0) {
+        Serial.print("Password: ");
         Serial.println(password);
-    }
-    else
-    {
-        Serial.println("[SHOW] You must specify either a valid variable or none. Type HELP SHOW for more information.");
-    }
-}
-
-void show_server()
-{
-    if (args[2] == NULL)
-    {
-        Serial.print("[SHOW] Server IP Address: ");
-        Serial.println(serverIp);
-        Serial.print("[SHOW] Server Port: ");
-        Serial.println(*port);
-    }
-    else if (strcmp(args[2], server_args[0]) == 0)
-    {
-        Serial.print("[SHOW] Server IP Address: ");
-        Serial.println(serverIp);
-    }
-    else if (strcmp(args[2], server_args[1]) == 0)
-    {
-        Serial.print("[SHOW] Server Port: ");
-        Serial.println(*port);
-    }
-    else
-    {
-        Serial.println("[SHOW] You must specify either a valid variable or none. Type HELP SHOW for more information.");
-    }
-}
-
-void show_sensor()
-{
-    if (args[2] == NULL)
-    {
-        Serial.print("[SHOW] Sensor Period: ");
-        Serial.println(*period);
-    }
-    else if (strcmp(args[2], sensor_args[0]) == 0)
-    {
-        Serial.print("[SHOW] Sensor Period: ");
-        Serial.println(*period);
-    }
-    else
-    {
-        Serial.println("[SHOW] You must specify either a valid variable or none. Type HELP SHOW for more information.");
-    }
-}
-
-int cmd_show()
-{
-    if (args[1] == NULL)
-    {
-        Serial.println("[SHOW] You must specify a valid parameter. Type HELP SHOW for more information.");
-    }
-    else if (strcmp(args[1], param_args[0]) == 0)
-    {
-        show_wifi();
-    }
-    else if (strcmp(args[1], param_args[1]) == 0)
-    {
-        show_server();
-    }
-    else if (strcmp(args[1], param_args[2]) == 0)
-    {
-        show_sensor();
-    }
-    else
-    {
-        Serial.println("[SHOW] You must specify a valid parameter. Type HELP SHOW for more information.");
+    } else if (strcmp(args[1], param_args[2]) == 0) {
+        Serial.print("IP Address: ");
+        Serial.println(ipaddress);
+    } else if (strcmp(args[1], param_args[3]) == 0) {
+        Serial.print("Port: ");
+        Serial.println(port);
+    } else if (strcmp(args[1], param_args[4]) == 0) {
+        Serial.print("Period: ");
+        Serial.println(period);
+     } else if (strcmp(args[1], param_args[5]) == 0) {
+        Serial.print("Buffer: ");
+        Serial.println(buffer);
+    } else {
+        Serial.println("[SHOW] You must specify a valid parameter or none. Type HELP SHOW for more information.");
     }
 }
 
 // SET function to alter the specified parameter
-void set_wifi()
-{
-    if (args[2] == NULL)
-    {
-        Serial.println("[SET] You must specify a valid variable. Type HELP SET for more information.");
-    }
-    else if (strcmp(args[2], wifi_args[0]) == 0)
-    {
-        if (args[3] == NULL)
-        {
-            Serial.println("[SET] You must specify a value. Type HELP SET for more information.");
+int cmd_set() {
+    bool error = false;
+    if (args[1] == NULL) {
+        Serial.println("[SET] You must specify a valid parameter. Type HELP SET for more information");
+    } else if (strcmp(args[1], param_args[0]) == 0) {
+        if (args[2] == NULL) {
+            error = true;
+        } else {
+            strcpy(ssid, args[2]);
         }
-        else
-        {
-            strcpy(ssid, args[3]);
+    } else if (strcmp(args[1], param_args[1]) == 0) {
+        if (args[2] == NULL) {
+            error = true;
+        } else {
+            strcpy(password, args[2]);
         }
-    }
-    else if (strcmp(args[2], wifi_args[1]) == 0)
-    {
-        if (args[3] == NULL)
-        {
-            Serial.println("[SET] You must specify a value. Type HELP SET for more information.");
+    } else if (strcmp(args[1], param_args[2]) == 0) {
+        if (args[2] == NULL) {
+            error = true;
+        } else {
+            strcpy(ipaddress, args[2]);
         }
-        else
-        {
-            strcpy(password, args[3]);
+    } else if (strcmp(args[1], param_args[3]) == 0) {
+        if (args[2] == NULL) {
+            error = true;
+        } else {
+            strcpy(port, args[2]);
         }
-    }
-    else
-    {
-        Serial.println("[SET] You must specify a valid variable. Type HELP SET for more information.");
-    }
-}
-
-void set_server()
-{
-    if (args[2] == NULL)
-    {
-        Serial.println("[SET] You must specify a valid variable. Type HELP SET for more information.");
-    }
-    else if (strcmp(args[2], server_args[0]) == 0)
-    {
-        if (args[3] == NULL)
-        {
-            Serial.println("[SET] You must specify a value. Type HELP SET for more information.");
+    } else if (strcmp(args[1], param_args[4]) == 0) {
+        if (args[2] == NULL) {
+            error = true;
+        } else {
+            strcpy(period, args[2]);
         }
-        else
-        {
-            strcpy(serverIp, args[3]);
+    } else if (strcmp(args[1], param_args[5]) == 0) {
+        if (args[2] == NULL) {
+            error = true;
+        } else {
+            strcpy(buffer, args[2]);
         }
     }
-    else if (strcmp(args[2], wifi_args[1]) == 0)
-    {
-        if (args[3] == NULL)
-        {
-            Serial.println("[SET] You must specify a value. Type HELP SET for more information.");
-        }
-        else
-        {
-            strcpy(port, args[3]);
-        }
-    }
-    else
-    {
-        Serial.println("[SET] You must specify a valid variable. Type HELP SET for more information.");
-    }
-}
-
-void set_sensor()
-{
-    if (args[2] == NULL)
-    {
-        Serial.println("[SET] You must specify a valid variable. Type HELP SET for more information.");
-    }
-    else if (strcmp(args[2], sensor_args[0]) == 0)
-    {
-        if (args[3] == NULL)
-        {
-            Serial.println("[SET] You must specify a value. Type HELP SET for more information.");
-        }
-        else
-        {
-            strcpy(period, args[3]);
-        }
-    }
-    else
-    {
-        Serial.println("[SET] You must specify a valid variable. Type HELP SET for more information.");
-    }
-}
-
-int cmd_set()
-{
-    if (args[1] == NULL)
-    {
+    else {
         Serial.println("[SET] You must specify a valid parameter. Type HELP SET for more information");
     }
-    else if (strcmp(args[1], param_args[0]) == 0)
-    {
-        set_wifi();
-        // Call function to reconnect to wifi
-    }
-    else if (strcmp(args[1], param_args[1]) == 0)
-    {
-        set_server();
-    }
-    else if (strcmp(args[1], param_args[2]) == 0)
-    {
-        set_sensor();
-    }
-    else
-    {
-        Serial.println("[SET] You must specify a valid parameter. Type HELP SET for more information");
+    if (error == true) {
+        Serial.println("[SET] You must specify a value. Type HELP SET for more information.");
+    } else {
+        Serial.print("Successfully set ");
+        Serial.println(args[2]);
     }
 }
 
 // The necessary things that probably already exist, just be sure Serial.begin is in there
-void setup()
-{
+void setup() {
     Serial.begin(115200);
     xTaskCreate(
         run_cli,
@@ -419,7 +249,6 @@ void setup()
         NULL);
 }
 
-void loop()
-{
+void loop() {
     Serial.println(" ");
 }
